@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>이메일 설정 - 행사 일정표</title>
+  <link href="/static/vendor/bootstrap.min.css" rel="stylesheet"/>
+  <link href="/static/vendor/bootstrap-icons.css" rel="stylesheet"/>
+  <style>
+    body { background: #f8f9fa; }
+    .settings-card {
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 2px 12px rgba(0,0,0,.08);
+      padding: 32px;
+      max-width: 640px;
+      margin: 0 auto;
+    }
+    .preset-btn { font-size: 0.82rem; }
+  </style>
+</head>
+<body>
+
+<nav class="navbar navbar-dark bg-primary mb-4">
+  <div class="container-fluid">
+    <a href="/" class="navbar-brand text-decoration-none">
+      <i class="bi bi-arrow-left me-1"></i> 행사 일정표
+    </a>
+    <div class="d-flex gap-2">
+      <a href="/events" class="btn btn-outline-light btn-sm"><i class="bi bi-list-ul"></i> 일정 관리</a>
+      <span class="navbar-text text-white"><i class="bi bi-gear"></i> 이메일 설정</span>
+    </div>
+  </div>
+</nav>
+
+<div class="container py-2">
+  <div class="settings-card">
+    <h5 class="mb-1 fw-bold"><i class="bi bi-envelope-gear text-primary"></i> SMTP 이메일 설정</h5>
+    <p class="text-muted small mb-4">행사 1개월 전, 2주 전에 자동으로 알림 메일을 발송합니다.</p>
+
+    <!-- 프리셋 버튼 -->
+    <div class="mb-3">
+      <span class="text-muted small me-2">빠른 설정:</span>
+      <button class="btn btn-outline-secondary btn-sm preset-btn me-1" onclick="setPreset('gmail')">
+        <i class="bi bi-google"></i> Gmail
+      </button>
+      <button class="btn btn-outline-secondary btn-sm preset-btn me-1" onclick="setPreset('naver')">
+        네이버 메일
+      </button>
+      <button class="btn btn-outline-secondary btn-sm preset-btn" onclick="setPreset('kakao')">
+        카카오 메일
+      </button>
+    </div>
+
+    <div class="row g-3">
+      <div class="col-md-8">
+        <label class="form-label fw-semibold">SMTP 서버</label>
+        <input type="text" class="form-control" id="smtp_host"
+          value="{{ settings.smtp_host }}" placeholder="smtp.gmail.com"/>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label fw-semibold">포트</label>
+        <input type="number" class="form-control" id="smtp_port"
+          value="{{ settings.smtp_port }}" placeholder="587"/>
+      </div>
+      <div class="col-12">
+        <label class="form-label fw-semibold">발신 이메일 주소</label>
+        <input type="email" class="form-control" id="smtp_user"
+          value="{{ settings.smtp_user }}" placeholder="your@email.com"/>
+      </div>
+      <div class="col-12">
+        <label class="form-label fw-semibold">앱 비밀번호</label>
+        <div class="input-group">
+          <input type="password" class="form-control" id="smtp_password"
+            value="{{ settings.smtp_password }}" placeholder="Gmail 앱 비밀번호 16자리"/>
+          <button class="btn btn-outline-secondary" type="button" onclick="togglePw()">
+            <i class="bi bi-eye" id="eyeIcon"></i>
+          </button>
+        </div>
+        <div class="form-text">
+          Gmail은 계정 비밀번호 대신 <strong>앱 비밀번호</strong>를 사용해야 합니다.
+          <a href="https://myaccount.google.com/apppasswords" target="_blank">앱 비밀번호 만들기 →</a>
+        </div>
+      </div>
+      <div class="col-md-8">
+        <label class="form-label fw-semibold">발신자 이름</label>
+        <input type="text" class="form-control" id="sender_name"
+          value="{{ settings.sender_name }}" placeholder="행사 일정표"/>
+      </div>
+      <div class="col-md-4 d-flex align-items-end">
+        <div class="form-check mb-2">
+          <input class="form-check-input" type="checkbox" id="use_tls"
+            {% if settings.use_tls %}checked{% endif %}/>
+          <label class="form-check-label fw-semibold" for="use_tls">TLS 사용</label>
+        </div>
+      </div>
+    </div>
+
+    <hr class="my-4"/>
+
+    <!-- 테스트 발송 -->
+    <div class="mb-4">
+      <label class="form-label fw-semibold">테스트 메일 발송</label>
+      <div class="input-group">
+        <input type="email" class="form-control" id="testEmail" placeholder="수신 이메일 주소"/>
+        <button class="btn btn-outline-primary" onclick="sendTest()">
+          <i class="bi bi-send"></i> 테스트 발송
+        </button>
+      </div>
+      <div id="testResult" class="mt-2"></div>
+    </div>
+
+    <div class="d-flex gap-2">
+      <button class="btn btn-primary flex-fill" onclick="saveSettings()">
+        <i class="bi bi-floppy"></i> 설정 저장
+      </button>
+      <a href="/" class="btn btn-outline-secondary">취소</a>
+    </div>
+
+    <div id="saveResult" class="mt-3"></div>
+
+    <hr class="my-4"/>
+    <div class="alert alert-info mb-0 small">
+      <i class="bi bi-info-circle"></i>
+      <strong>알림 발송 시점:</strong> 매일 오전 9시에 확인하여, 행사 시작 <strong>28~32일 전</strong>에 1개월 알림,
+      <strong>12~16일 전</strong>에 2주 알림을 자동 발송합니다.
+    </div>
+  </div>
+</div>
+
+<script src="/static/vendor/bootstrap.bundle.min.js"></script>
+<script>
+const presets = {
+  gmail:  { host: 'smtp.gmail.com',      port: 587, tls: true },
+  naver:  { host: 'smtp.naver.com',      port: 587, tls: true },
+  kakao:  { host: 'smtp.kakao.com',      port: 587, tls: true },
+};
+
+function setPreset(key) {
+  const p = presets[key];
+  document.getElementById('smtp_host').value = p.host;
+  document.getElementById('smtp_port').value = p.port;
+  document.getElementById('use_tls').checked = p.tls;
+}
+
+function togglePw() {
+  const pw = document.getElementById('smtp_password');
+  const icon = document.getElementById('eyeIcon');
+  if (pw.type === 'password') {
+    pw.type = 'text';
+    icon.className = 'bi bi-eye-slash';
+  } else {
+    pw.type = 'password';
+    icon.className = 'bi bi-eye';
+  }
+}
+
+function saveSettings() {
+  const payload = {
+    smtp_host: document.getElementById('smtp_host').value,
+    smtp_port: parseInt(document.getElementById('smtp_port').value),
+    smtp_user: document.getElementById('smtp_user').value,
+    smtp_password: document.getElementById('smtp_password').value,
+    sender_name: document.getElementById('sender_name').value,
+    use_tls: document.getElementById('use_tls').checked,
+  };
+
+  fetch('/api/settings', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  })
+  .then(r => r.json())
+  .then(data => {
+    const el = document.getElementById('saveResult');
+    el.innerHTML = `<div class="alert alert-success py-2"><i class="bi bi-check-circle"></i> ${data.message}</div>`;
+    setTimeout(() => el.innerHTML = '', 3000);
+  })
+  .catch(() => {
+    document.getElementById('saveResult').innerHTML =
+      '<div class="alert alert-danger py-2">저장 중 오류가 발생했습니다.</div>';
+  });
+}
+
+function sendTest() {
+  const email = document.getElementById('testEmail').value;
+  const resultEl = document.getElementById('testResult');
+  resultEl.innerHTML = '<span class="text-muted small"><span class="spinner-border spinner-border-sm"></span> 발송 중...</span>';
+
+  fetch('/api/test-email', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email })
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.error) {
+      resultEl.innerHTML = `<div class="alert alert-danger py-2 small"><i class="bi bi-x-circle"></i> ${data.error}</div>`;
+    } else {
+      resultEl.innerHTML = `<div class="alert alert-success py-2 small"><i class="bi bi-check-circle"></i> ${data.message}</div>`;
+    }
+  })
+  .catch(() => {
+    resultEl.innerHTML = '<div class="alert alert-danger py-2 small">연결 오류</div>';
+  });
+}
+</script>
+</body>
+</html>

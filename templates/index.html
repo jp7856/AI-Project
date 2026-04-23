@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>행사 일정표</title>
+  <link href="/static/vendor/bootstrap.min.css" rel="stylesheet"/>
+  <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.css" rel="stylesheet"/>
+  <link href="/static/vendor/bootstrap-icons.css" rel="stylesheet"/>
+  <style>
+    body { background: #f8f9fa; }
+    .navbar-brand { font-weight: 700; font-size: 1.3rem; }
+    #calendar-wrap {
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 2px 12px rgba(0,0,0,.08);
+      padding: 24px;
+    }
+    .fc-event { cursor: pointer; border-radius: 4px !important; font-size: 0.82rem; }
+    .fc-toolbar-title { font-weight: 700; font-size: 1.2rem; }
+    .modal-header { border-bottom: none; }
+    .modal-footer { border-top: none; }
+    .badge-notify { font-size: 0.7rem; }
+    .fc-daygrid-event-dot { display: none; }
+    .fc-list-event-title { cursor: pointer; }
+    #loadingSpinner { display: none; }
+  </style>
+</head>
+<body>
+
+<nav class="navbar navbar-dark bg-primary mb-4">
+  <div class="container-fluid">
+    <span class="navbar-brand"><i class="bi bi-calendar3-event"></i> 행사 일정표</span>
+    <div class="d-flex gap-2">
+      <button class="btn btn-light btn-sm" onclick="openAddModal()">
+        <i class="bi bi-plus-lg"></i> 행사 추가
+      </button>
+      <a href="/events" class="btn btn-outline-light btn-sm">
+        <i class="bi bi-list-ul"></i> 일정 관리
+      </a>
+      <a href="/revenue" class="btn btn-outline-light btn-sm">
+        <i class="bi bi-bar-chart-line"></i> 매출 현황
+      </a>
+      <a href="/settings" class="btn btn-outline-light btn-sm">
+        <i class="bi bi-gear"></i> 이메일 설정
+      </a>
+    </div>
+  </div>
+</nav>
+
+<div class="container-fluid px-4">
+  <div id="calendar-wrap">
+    <div id="calendar"></div>
+  </div>
+</div>
+
+<!-- 행사 추가/수정 모달 -->
+<div class="modal fade" id="eventModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header pb-0">
+        <h5 class="modal-title" id="modalTitle"><i class="bi bi-calendar-plus"></i> 행사 추가</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="eventId"/>
+        <div class="row g-3">
+          <div class="col-12">
+            <label class="form-label fw-semibold">행사명 <span class="text-danger">*</span></label>
+            <input type="text" class="form-control" id="eventTitle" placeholder="행사 제목을 입력하세요"/>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">시작일 <span class="text-danger">*</span></label>
+            <input type="date" class="form-control" id="eventStart"/>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">종료일 <span class="text-danger">*</span></label>
+            <input type="date" class="form-control" id="eventEnd"/>
+          </div>
+          <div class="col-12">
+            <label class="form-label fw-semibold">장소</label>
+            <input type="text" class="form-control" id="eventLocation" placeholder="행사 장소"/>
+          </div>
+          <div class="col-12">
+            <label class="form-label fw-semibold">내용</label>
+            <textarea class="form-control" id="eventDesc" rows="3" placeholder="행사 설명을 입력하세요"></textarea>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">
+              <i class="bi bi-currency-dollar text-success"></i> 매출 금액
+              <span class="text-muted fw-normal small">(종료 후 입력)</span>
+            </label>
+            <div class="input-group">
+              <input type="number" class="form-control" id="eventRevenue" placeholder="0" min="0" step="1000"/>
+              <span class="input-group-text">원</span>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">표시 색상</label>
+            <input type="color" class="form-control form-control-color w-100" id="eventColor" value="#3788d8"/>
+          </div>
+          <div class="col-12">
+            <label class="form-label fw-semibold">추가 수신자 <span class="text-muted fw-normal small">(선택)</span></label>
+            <input type="text" class="form-control" id="eventEmail"
+              placeholder="추가할 이메일 입력 (쉼표로 구분)"/>
+            <div class="form-text">
+              <i class="bi bi-envelope-check text-primary"></i>
+              기본 수신: <strong>jp, kwonyh, ssem2 @neungyule.com</strong> + 위 추가 입력
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer pt-0 justify-content-between">
+        <button type="button" class="btn btn-danger btn-sm" id="deleteBtn" onclick="deleteEvent()" style="display:none">
+          <i class="bi bi-trash"></i> 삭제
+        </button>
+        <div>
+          <button type="button" class="btn btn-secondary me-2" data-bs-dismiss="modal">취소</button>
+          <button type="button" class="btn btn-primary" onclick="saveEvent()">
+            <span id="loadingSpinner" class="spinner-border spinner-border-sm me-1"></span>
+            저장
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 행사 상세 모달 -->
+<div class="modal fade" id="detailModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header" id="detailHeader">
+        <h5 class="modal-title" id="detailTitle"></h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" id="detailBody"></div>
+      <div class="modal-footer border-top-0">
+        <button type="button" class="btn btn-outline-primary btn-sm" onclick="editFromDetail()">
+          <i class="bi bi-pencil"></i> 수정
+        </button>
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">닫기</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="/static/vendor/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/locales/ko.global.min.js"></script>
+
+<script>
+let calendar;
+let currentDetailId = null;
+const eventModal = new bootstrap.Modal(document.getElementById('eventModal'));
+const detailModal = new bootstrap.Modal(document.getElementById('detailModal'));
+
+document.addEventListener('DOMContentLoaded', function() {
+  const calendarEl = document.getElementById('calendar');
+  calendar = new FullCalendar.Calendar(calendarEl, {
+    locale: 'ko',
+    initialView: 'dayGridMonth',
+    headerToolbar: {
+      left: 'prev,next today',
+      center: 'title',
+      right: 'dayGridMonth,dayGridYear,listMonth'
+    },
+    views: {
+      dayGridYear: { type: 'dayGrid', duration: { year: 1 }, buttonText: '연간' }
+    },
+    height: 'auto',
+    events: fetchEvents,
+    eventClick: function(info) {
+      showDetail(info.event.id);
+    },
+    dateClick: function(info) {
+      openAddModal(info.dateStr);
+    },
+    eventDidMount: function(info) {
+      const tooltip = info.event.extendedProps.location
+        ? `📍 ${info.event.extendedProps.location}` : '';
+      if (tooltip) {
+        info.el.setAttribute('title', tooltip);
+      }
+    }
+  });
+  calendar.render();
+});
+
+function fetchEvents(info, successCb, failureCb) {
+  fetch('/api/events')
+    .then(r => r.json())
+    .then(data => successCb(data))
+    .catch(err => failureCb(err));
+}
+
+function openAddModal(dateStr) {
+  document.getElementById('eventId').value = '';
+  document.getElementById('eventTitle').value = '';
+  document.getElementById('eventStart').value = dateStr || '';
+  document.getElementById('eventEnd').value = dateStr || '';
+  document.getElementById('eventLocation').value = '';
+  document.getElementById('eventDesc').value = '';
+  document.getElementById('eventEmail').value = '';
+  document.getElementById('eventRevenue').value = '';
+  document.getElementById('eventColor').value = '#3788d8';
+  document.getElementById('modalTitle').innerHTML = '<i class="bi bi-calendar-plus"></i> 행사 추가';
+  document.getElementById('deleteBtn').style.display = 'none';
+  eventModal.show();
+}
+
+function showDetail(id) {
+  fetch(`/api/events/${id}`)
+    .then(r => r.json())
+    .then(ev => {
+      currentDetailId = id;
+      const header = document.getElementById('detailHeader');
+      header.style.backgroundColor = ev.backgroundColor + '22';
+      document.getElementById('detailTitle').textContent = ev.title;
+
+      const start = ev.start_date;
+      const end = ev.end_date;
+      const days = Math.round((new Date(end) - new Date(start)) / 86400000) + 1;
+      const today = new Date().toISOString().split('T')[0];
+      const dLeft = Math.ceil((new Date(start) - new Date(today)) / 86400000);
+      const dBadge = dLeft > 0
+        ? `<span class="badge bg-warning text-dark ms-2">D-${dLeft}</span>`
+        : dLeft === 0
+          ? `<span class="badge bg-danger ms-2">D-Day</span>`
+          : `<span class="badge bg-secondary ms-2">종료</span>`;
+
+      const revText = ev.revenue != null
+        ? `<strong class="text-success">${Math.round(ev.revenue).toLocaleString('ko-KR')}원</strong>`
+        : '<span class="text-muted">미입력</span>';
+      document.getElementById('detailBody').innerHTML = `
+        <table class="table table-borderless table-sm">
+          <tr><th width="90">📆 일정</th><td>${start} ~ ${end} (${days}일)${dBadge}</td></tr>
+          ${ev.location ? `<tr><th>📍 장소</th><td>${ev.location}</td></tr>` : ''}
+          ${ev.description ? `<tr><th>📝 내용</th><td>${ev.description}</td></tr>` : ''}
+          <tr><th>💰 매출</th><td>${revText}</td></tr>
+          <tr><th>📧 알림</th><td>
+            <span class="badge ${ev.notified_1month ? 'bg-success' : 'bg-secondary'} badge-notify me-1">1개월 전 ${ev.notified_1month ? '✓발송' : '대기'}</span>
+            <span class="badge ${ev.notified_2weeks ? 'bg-success' : 'bg-secondary'} badge-notify">2주 전 ${ev.notified_2weeks ? '✓발송' : '대기'}</span>
+          </td></tr>
+        </table>
+      `;
+      detailModal.show();
+    });
+}
+
+function editFromDetail() {
+  detailModal.hide();
+  fetch(`/api/events/${currentDetailId}`)
+    .then(r => r.json())
+    .then(ev => {
+      document.getElementById('eventId').value = ev.id;
+      document.getElementById('eventTitle').value = ev.title;
+      document.getElementById('eventStart').value = ev.start_date;
+      document.getElementById('eventEnd').value = ev.end_date;
+      document.getElementById('eventLocation').value = ev.location || '';
+      document.getElementById('eventDesc').value = ev.description || '';
+      document.getElementById('eventEmail').value = ev.notify_email || '';
+      document.getElementById('eventRevenue').value = ev.revenue != null ? ev.revenue : '';
+      document.getElementById('eventColor').value = ev.backgroundColor || '#3788d8';
+      document.getElementById('modalTitle').innerHTML = '<i class="bi bi-pencil"></i> 행사 수정';
+      document.getElementById('deleteBtn').style.display = 'inline-block';
+      eventModal.show();
+    });
+}
+
+function saveEvent() {
+  const id = document.getElementById('eventId').value;
+  const title = document.getElementById('eventTitle').value.trim();
+  const start = document.getElementById('eventStart').value;
+  const end = document.getElementById('eventEnd').value;
+
+  if (!title) { alert('행사명을 입력하세요.'); return; }
+  if (!start || !end) { alert('날짜를 입력하세요.'); return; }
+  if (end < start) { alert('종료일이 시작일보다 빠를 수 없습니다.'); return; }
+
+  const spinner = document.getElementById('loadingSpinner');
+  spinner.style.display = 'inline-block';
+
+  const payload = {
+    title,
+    start_date: start,
+    end_date: end,
+    location: document.getElementById('eventLocation').value,
+    description: document.getElementById('eventDesc').value,
+    notify_email: document.getElementById('eventEmail').value,
+    color: document.getElementById('eventColor').value,
+    revenue: document.getElementById('eventRevenue').value !== '' ? parseFloat(document.getElementById('eventRevenue').value) : null,
+  };
+
+  const url = id ? `/api/events/${id}` : '/api/events';
+  const method = id ? 'PUT' : 'POST';
+
+  fetch(url, {
+    method,
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  })
+  .then(r => r.json())
+  .then(() => {
+    spinner.style.display = 'none';
+    eventModal.hide();
+    calendar.refetchEvents();
+  })
+  .catch(err => {
+    spinner.style.display = 'none';
+    alert('저장 중 오류가 발생했습니다.');
+  });
+}
+
+function deleteEvent() {
+  const id = document.getElementById('eventId').value;
+  if (!id || !confirm('이 행사를 삭제하시겠습니까?')) return;
+  fetch(`/api/events/${id}`, { method: 'DELETE' })
+    .then(() => {
+      eventModal.hide();
+      calendar.refetchEvents();
+    });
+}
+</script>
+</body>
+</html>

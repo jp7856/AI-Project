@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://127.0.0.1:5000)",
+      "mcp__Claude_in_Chrome__tabs_context_mcp",
+      "Bash(python -c ' *)",
+      "Bash(curl -s http://127.0.0.1:5000/api/events)",
+      "Bash(python -m json.tool)",
+      "Bash(curl -s http://127.0.0.1:5000/api/revenue/summary)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://127.0.0.1:5000/revenue)",
+      "Bash(curl -s http://127.0.0.1:5000/revenue)"
+    ]
+  }
+}
